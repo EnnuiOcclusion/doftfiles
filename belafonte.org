@@ -1,0 +1,800 @@
+* Config
+  
+The one config file to rule them all!
+
+This is a practice in literate programming to get all my bulid settings in one place.
+
+** Bash
+
+#+BEGIN_SRC bash :tangle config/.bashrc
+  export PATH="$PATH:$HOME/npm/bin"
+  export NODE_PATH="$NODE_PATH:$HOME/npm/lib/node_modules"
+
+  export PATH="$PATH:$HOME/dotfiles/bin"
+#+END_SRC
+
+*** Symlinks
+    
+#+BEGIN_SRC sh :tangle config/make_symlinks.sh :noweb yes
+  ln -fs $HOME/dotfiles/config/.bashrc $HOME/.bashrc
+
+  ln -fs $HOME/dotfiles/config/.bashrc $HOME/.bash_profile
+#+END_SRC
+** X
+   
+This is what actually gets run by lightdm after login to get a user session going.
+   
+There are about 15 different places that X can look for its configuration on startup. Let's define what we want out the actual configuration here, tangle out the config file, then ensure appropriate symlinks are in place.
+
+#+BEGIN_SRC sh :tangle config/.xinitrc :noweb yes
+  #!/bin/sh
+
+  # Load resources
+
+  xrdb -merge .Xresources
+
+  # Set up an icon tray
+
+  trayer --edge top --align right --SetDockType true --SetPartialStrut true --expand true --width 10 --transparent true --tint 0x191970 --height 12 &
+
+  # Fire up apps
+
+  xscreensaver -no-splash &
+
+  # Start system tray
+  stalonetray &
+
+  # Start our compositor, which draws shadows & effects
+  compton &
+
+  # Set background color
+  hsetroot -solid "#002b36"
+
+  # This guy hides the mouse after 5 seconds of inactivity
+  unclutter -grab &
+
+  # Start xmonad
+  exec xmonad
+#+END_SRC
+
+*** Symlinks
+
+The following should all refer to the file we just tangled.
+
+#+BEGIN_SRC sh :tangle config/make_symlinks.sh :noweb yes
+  ln -fs $HOME/dotfiles/config/.xinitrc $HOME/.xinitrc
+  ln -fs $HOME/dotfiles/config/.xinitrc $HOME/.xprofile
+  ln -fs $HOME/dotfiles/config/.xinitrc $HOME/.xsession
+#+END_SRC
+
+** XMonad
+
+Everyone's favorite haskell based titling window manager.
+This guy does the actual layout of the windows on the screen.
+
+#+BEGIN_SRC haskell :tangle config/xmonad.hs :noweb yes
+  import XMonad
+  import XMonad.Hooks.DynamicLog
+  import XMonad.Hooks.ManageDocks
+  import XMonad.Util.Run(spawnPipe)
+  import XMonad.Util.EZConfig(additionalKeys)
+  import XMonad.Layout.Spacing
+  import XMonad.Actions.CycleWS
+  import System.IO
+
+  main = do
+      xmproc <- spawnPipe "xmobar"
+
+      xmonad $ defaultConfig
+          { -- startupHook = do
+              -- rects <- xdisplays
+              -- xmproc <- spwanPipe "xmobar"
+          manageHook = manageDocks <+> manageHook defaultConfig
+          , layoutHook = avoidStruts  $  smartSpacingWithEdge 20 $ layoutHook defaultConfig
+          , logHook = dynamicLogWithPP xmobarPP
+            { ppOutput = hPutStrLn xmproc
+             , ppTitle = xmobarColor "#657b83" "" . shorten 100
+             , ppCurrent = xmobarColor "#c0c0c0" "" . wrap "" ""
+             , ppSep     = xmobarColor "#c0c0c0" "" " | "
+             , ppUrgent  = xmobarColor "#ff69b4" ""
+             , ppLayout = const "" -- to disable the layout info on xmobar
+             }
+          , modMask = mod4Mask     -- Rebind Mod to the Windows key
+          , terminal = "alacritty" -- Get that speedy goodness
+          , borderWidth = 3
+          , focusedBorderColor = "#586e75"
+          , normalBorderColor = "#002b36"
+          } `additionalKeys`
+          [ ((mod4Mask .|. shiftMask, xK_z), spawn "xscreensaver-command -lock; xset dpms force off")
+          , ((controlMask, xK_Print), spawn "sleep 0.2; scrot -s")
+          , ((0, xK_Print), spawn "scrot")
+          , ((mod4Mask, xK_apostrophe), spawn "emacs-anywhere")
+          -- , ((mod4Mask), xK_o, swapNextScreen)
+          -- , ((mod4Mask .|. shiftMask, xK_o), shiftNextScreen)
+          ]
+
+#+END_SRC
+
+*** Symlinks
+    
+#+BEGIN_SRC sh :tangle config/make_symlinks.sh :noweb yes
+  mkdir -p $HOME/.xmonad
+  ln -fs $HOME/dotfiles/config/xmonad.hs $HOME/.xmonad/xmonad.hs
+#+END_SRC
+
+** Compton
+   
+This is our window compositor. It makes things look nice by adding shadows and fades. Supposedly this compositor in particular is super lightweight and fixes screen-tearing issues you can get with other options.
+
+#+BEGIN_SRC conf :tangle config/compton.conf
+  #################################
+  #
+  # Backend
+  #
+  #################################
+
+  # Backend to use: "xrender" or "glx".
+  # GLX backend is typically much faster but depends on a sane driver.
+  backend = "glx";
+
+  #################################
+  #
+  # GLX backend
+  #
+  #################################
+
+  glx-no-stencil = true;
+
+  # GLX backend: Copy unmodified regions from front buffer instead of redrawing them all.
+  # My tests with nvidia-drivers show a 10% decrease in performance when the whole screen is modified,
+  # but a 20% increase when only 1/4 is.
+  # My tests on nouveau show terrible slowdown.
+  # Useful with --glx-swap-method, as well.
+  glx-copy-from-front = false;
+
+  # GLX backend: Use MESA_copy_sub_buffer to do partial screen update.
+  # My tests on nouveau shows a 200% performance boost when only 1/4 of the screen is updated.
+  # May break VSync and is not available on some drivers.
+  # Overrides --glx-copy-from-front.
+  # glx-use-copysubbuffermesa = true;
+
+  # GLX backend: Avoid rebinding pixmap on window damage.
+  # Probably could improve performance on rapid window content changes, but is known to break things on some drivers (LLVMpipe).
+  # Recommended if it works.
+  # glx-no-rebind-pixmap = true;
+
+
+  # GLX backend: GLX buffer swap method we assume.
+  # Could be undefined (0), copy (1), exchange (2), 3-6, or buffer-age (-1).
+  # undefined is the slowest and the safest, and the default value.
+  # copy is fastest, but may fail on some drivers,
+  # 2-6 are gradually slower but safer (6 is still faster than 0).
+  # Usually, double buffer means 2, triple buffer means 3.
+  # buffer-age means auto-detect using GLX_EXT_buffer_age, supported by some drivers.
+  # Useless with --glx-use-copysubbuffermesa.
+  # Partially breaks --resize-damage.
+  # Defaults to undefined.
+  glx-swap-method = "undefined";
+
+  #################################
+  #
+  # Shadows
+  #
+  #################################
+
+  # Enabled client-side shadows on windows.
+  shadow = true;
+  # Don't draw shadows on DND windows.
+  no-dnd-shadow = true;
+  # Avoid drawing shadows on dock/panel windows.
+  no-dock-shadow = false;
+  # Zero the part of the shadow's mask behind the window. Fix some weirdness with ARGB windows.
+  clear-shadow = true;
+  # The blur radius for shadows. (default 12)
+  shadow-radius = 20;
+  # The left offset for shadows. (default -15)
+  shadow-offset-x = -18;
+  # The top offset for shadows. (default -15)
+  shadow-offset-y = -18;
+  # The translucency for shadows. (default .75)
+  shadow-opacity = .75;
+
+  # Set if you want different colour shadows
+  shadow-red =      0;
+  shadow-green =    0;
+  shadow-blue =     0;
+
+  # Set a different colored shadow for the selected window.
+  shadow-focused-red = 0.32421875;
+  shadow-focused-green = 0.70703125;
+  shadow-focused-blue = 0.8046875;
+
+  # The shadow exclude options are helpful if you have shadows enabled. Due to the way compton draws its shadows, certain applications will have visual glitches
+  # (most applications are fine, only apps that do weird things with xshapes or argb are affected).
+  # This list includes all the affected apps I found in my testing. The "! name~=''" part excludes shadows on any "Unknown" windows, this prevents a visual glitch with the XFWM alt tab switcher.
+  # shadow-exclude = [
+      # "! name~=''"
+      # "name = 'Notification'",
+      # "name = 'Plank'",
+      # "name = 'Docky'",
+      # "name = 'Kupfer'",
+      # "name = 'xfce4-notifyd'",
+      # "name *= 'VLC'",
+      # "name *= 'compton'",
+      # "name *= 'Chromium'",
+      # "name *= 'Chrome'",
+      # "name *= 'Firefox'",
+      # "class_g = 'Conky'",
+      # "class_g = 'Kupfer'",
+      # "class_g = 'Synapse'",
+      # "class_g ?= 'Notify-osd'",
+      # "class_g ?= 'Cairo-dock'",
+      # "class_g ?= 'Xfce4-notifyd'",
+      # "class_g ?= 'Xfce4-power-manager'"
+  # ];
+  # Avoid drawing shadow on all shaped windows (see also: --detect-rounded-corners)
+  shadow-ignore-shaped = false;
+
+  #################################
+  #
+  # Opacity
+  #
+  #################################
+
+  menu-opacity = 0.8;
+  inactive-opacity = 0.25;
+  active-opacity = 1;
+  frame-opacity = 1;
+  inactive-opacity-override = true;
+  alpha-step = 0.06;
+
+  # Dim inactive windows. (0.0 - 1.0)
+  inactive-dim = 0.1;
+  # Do not let dimness adjust based on window opacity.
+  # inactive-dim-fixed = true;
+  # Blur background of transparent windows. Bad performance with X Render backend. GLX backend is preferred.
+  blur-background = true;
+  # Blur background of opaque windows with transparent frames as well.
+  # blur-background-frame = true;
+  # Do not let blur radius adjust based on window opacity.
+  blur-background-fixed = false;
+  blur-background-exclude = [
+      "window_type = 'dock'",
+      "window_type = 'desktop'"
+  ];
+  blur-kern = "7x7box";
+
+  #################################
+  #
+  # Fading
+  #
+  #################################
+
+  # Fade windows during opacity changes.
+  fading = true;
+  # The time between steps in a fade in milliseconds. (default 10).
+  fade-delta = 10;
+  # Opacity change between steps while fading in. (default 0.028).
+  fade-in-step = 0.03;
+  # Opacity change between steps while fading out. (default 0.03).
+  fade-out-step = 0.03;
+  # Fade windows in/out when opening/closing
+  # no-fading-openclose = true;
+
+  # Specify a list of conditions of windows that should not be faded.
+  fade-exclude = [ ];
+
+  #################################
+  #
+  # Other
+  #
+  #################################
+
+  # Try to detect WM windows and mark them as active.
+  mark-wmwin-focused = true;
+  # Mark all non-WM but override-redirect windows active (e.g. menus).
+  mark-ovredir-focused = true;
+  # Use EWMH _NET_WM_ACTIVE_WINDOW to determine which window is focused instead of using FocusIn/Out events.
+  # Usually more reliable but depends on a EWMH-compliant WM.
+  use-ewmh-active-win = true;
+  # Detect rounded corners and treat them as rectangular when --shadow-ignore-shaped is on.
+  detect-rounded-corners = true;
+
+  # Detect _NET_WM_OPACITY on client windows, useful for window managers not passing _NET_WM_OPACITY of client windows to frame windows.
+  # This prevents opacity being ignored for some apps.
+  # For example without this enabled my xfce4-notifyd is 100% opacity no matter what.
+  detect-client-opacity = true;
+
+  # Specify refresh rate of the screen.
+  # If not specified or 0, compton will try detecting this with X RandR extension.
+  refresh-rate = 0;
+
+  # Set VSync method. VSync methods currently available:
+  # none: No VSync
+  # drm: VSync with DRM_IOCTL_WAIT_VBLANK. May only work on some drivers.
+  # opengl: Try to VSync with SGI_video_sync OpenGL extension. Only work on some drivers.
+  # opengl-oml: Try to VSync with OML_sync_control OpenGL extension. Only work on some drivers.
+  # opengl-swc: Try to VSync with SGI_swap_control OpenGL extension. Only work on some drivers. Works only with GLX backend. Known to be most effective on many drivers. Does not actually control paint timing, only buffer swap is affected, so it doesn’t have the effect of --sw-opti unlike other methods. Experimental.
+  # opengl-mswc: Try to VSync with MESA_swap_control OpenGL extension. Basically the same as opengl-swc above, except the extension we use.
+  # (Note some VSync methods may not be enabled at compile time.)
+  vsync = "opengl-swc";
+
+  # Enable DBE painting mode, intended to use with VSync to (hopefully) eliminate tearing.
+  # Reported to have no effect, though.
+  dbe = false;
+  # Painting on X Composite overlay window. Recommended.
+  paint-on-overlay = true;
+
+  # Limit compton to repaint at most once every 1 / refresh_rate second to boost performance.
+  # This should not be used with --vsync drm/opengl/opengl-oml as they essentially does --sw-opti's job already,
+  # unless you wish to specify a lower refresh rate than the actual value.
+  sw-opti = false;
+
+  # Unredirect all windows if a full-screen opaque window is detected, to maximize performance for full-screen windows, like games.
+  # Known to cause flickering when redirecting/unredirecting windows.
+  # paint-on-overlay may make the flickering less obvious.
+  unredir-if-possible = true;
+
+  # Specify a list of conditions of windows that should always be considered focused.
+  focus-exclude = [ ];
+
+  # Use WM_TRANSIENT_FOR to group windows, and consider windows in the same group focused at the same time.
+  detect-transient = true;
+  # Use WM_CLIENT_LEADER to group windows, and consider windows in the same group focused at the same time.
+  # WM_TRANSIENT_FOR has higher priority if --detect-transient is enabled, too.
+  detect-client-leader = true;
+
+  #################################
+  #
+  # Window type settings
+  #
+  #################################
+
+  wintypes:
+  {
+      tooltip =
+      {
+          # fade: Fade the particular type of windows.
+          fade = true;
+          # shadow: Give those windows shadow
+          shadow = false;
+          # opacity: Default opacity for the type of windows.
+          opacity = 0.85;
+          # focus: Whether to always consider windows of this type focused.
+          focus = true;
+      };
+  };
+#+END_SRC
+
+*** Symlinks
+    
+#+BEGIN_SRC sh :tangle config/make_symlinks.sh :noweb yes
+  ln -fs $HOME/dotfiles/config/compton.conf $HOME/.config/compton.conf
+#+END_SRC
+
+** Alacritty
+
+This is our GPU accelerated terminal emulator.
+
+Keeps it very fast and simple, just the way we like it.
+
+Written in rust. Building this was my first real exposure to the language. The build took a lot longer than I expected and the compiler threw out some language warnings about unnecessary parentheses.
+
+#+BEGIN_SRC yaml :tangle config/alacritty.yml :noweb yes
+
+  # Any items in the `env` entry below will be added as
+  # environment variables. Some entries may override variables
+  # set by alacritty it self.
+  env:
+    # TERM env customization.
+    #
+    # If this property is not set, alacritty will set it to xterm-256color.
+    #
+    # Note that some xterm terminfo databases don't declare support for italics.
+    # You can verify this by checking for the presence of `smso` and `sitm` in
+    # `infocmp xterm-256color`.
+    # TERM: xterm-256color-italic
+    TERM: xterm-256color
+
+  # Window dimensions in character columns and lines
+  # (changes require restart)
+  window.dimensions:
+    columns: 95
+    lines: 75
+
+  # Adds this many blank pixels of padding around the window
+  # Units are physical pixels; this is not DPI aware.
+  # (change requires restart)
+  window.padding:
+    x: 2
+    y: 2
+
+  # The FreeType rasterizer needs to know the device DPI for best results
+  # (changes require restart)
+  dpi:
+    x: 220.0
+    y: 220.0
+    # x: 96.0
+    # y: 96.0
+
+  # Display tabs using this many cells (changes require restart)
+  tabspaces: 8
+
+  # When true, bold text is drawn using the bright variant of colors.
+  draw_bold_text_with_bright_colors: true
+
+  # Font configuration (changes require restart)
+  font:
+    # The normal (roman) font face to use.
+    normal:
+      family: "Fira Code Retina" # should be "Menlo" or something on macOS.
+      # Style can be specified to pick a specific face.
+      style: Retina
+
+    # The bold font face
+    bold:
+      family: "Fira Code Retina" # should be "Menlo" or something on macOS.
+      # Style can be specified to pick a specific face.
+      style: Bold
+
+    # The italic font face
+    italic:
+      family: "Fira Code Retina" # should be "Menlo" or something on macOS.
+      # Style can be specified to pick a specific face.
+      # style: Italic
+
+    # Point size of the font
+    size: 12.0
+
+    # Offset is the extra space around each character. offset.y can be thought of
+    # as modifying the linespacing, and offset.x as modifying the letter spacing.
+    offset:
+      x: 0
+      y: 0
+
+    # Glyph offset determines the locations of the glyphs within their cells with
+    # the default being at the bottom. Increase the x offset to move the glyph to
+    # the right, increase the y offset to move the glyph upward.
+    glyph_offset:
+      x: 0
+      y: 0
+
+    # OS X only: use thin stroke font rendering. Thin strokes are suitable
+    # for retina displays, but for non-retina you probably want this set to
+    # false.
+    use_thin_strokes: true
+
+  # Should display the render timer
+  render_timer: false
+
+  # Use custom cursor colors. If true, display the cursor in the cursor.foreground
+  # and cursor.background colors, otherwise invert the colors of the cursor.
+  custom_cursor_colors: false
+
+  # Colors
+
+  # Colors (Solarized Dark)
+  colors:
+    # Default colors
+    primary:
+      background: '0x002b36'
+      foreground: '0x839496'
+
+    # Normal colors
+    normal:
+      black:   '0x073642'
+      red:     '0xdc322f'
+      green:   '0x859900'
+      yellow:  '0xb58900'
+      blue:    '0x268bd2'
+      magenta: '0xd33682'
+      cyan:    '0x2aa198'
+      white:   '0xeee8d5'
+
+    # Bright colors
+    bright:
+      black:   '0x002b36'
+      red:     '0xcb4b16'
+      green:   '0x586e75'
+      yellow:  '0x657b83'
+      blue:    '0x839496'
+      magenta: '0x6c71c4'
+      cyan:    '0x93a1a1'
+      white:   '0xfdf6e3'
+
+  # Colors (Solarized Light)
+  # colors:
+  #   # Default colours
+  #   primary:
+  #     background: '0xffffff'
+  #     foreground: '0x2e2e2d'
+
+  #   # Colors the cursor will use if `custom_cursor_colors` is true
+  #   cursor:
+  #     text: '0x2e2e2d'
+  #     # text: '0x000000'
+  #     cursor: '0xffffff'
+
+  #   # Normal colors
+  #   normal:
+  #     black:   '0x000000'
+  #     red:     '0xc62828'
+  #     green:   '0x558b2f'
+  #     yellow:  '0xf9a825'
+  #     blue:    '0x1565c0'
+  #     magenta: '0x6a1e9a'
+  #     cyan:    '0x00838f'
+  #     white:   '0xf2f2f2'
+
+  #   # Bright colors
+  #   bright:
+  #     black:   '0x545454'
+  #     red:     '0xef5350'
+  #     green:   '0x8bc34a'
+  #     yellow:  '0xffeb3b'
+  #     blue:    '0x64b5f6'
+  #     magenta: '0xba68c8'
+  #     cyan:    '0x26c6da'
+  #     white:   '0xe0e0e0'
+
+  #   # Dim colors (Optional)
+  #   dim:
+  #     black:   '0x333333'
+  #     red:     '0xf2777a'
+  #     green:   '0x99cc99'
+  #     yellow:  '0xffcc66'
+  #     blue:    '0x6699cc'
+  #     magenta: '0xcc99cc'
+  #     cyan:    '0x66cccc'
+  #     white:   '0xdddddd'
+
+    # Tomorrow Night Bright
+    # primary:
+    #   background: '0x000000'
+    #   foreground: '0xeaeaea'
+    #
+    # cursor:
+    #   text: '0x000000'
+    #   cursor: '0xffffff'
+    #
+    # normal:
+    #   black:   '0x000000'
+    #   red:     '0xd54e53'
+    #   green:   '0xb9ca4a'
+    #   yellow:  '0xe6c547'
+    #   blue:    '0x7aa6da'
+    #   magenta: '0xc397d8'
+    #   cyan:    '0x70c0ba'
+    #   white:   '0xffffff'
+    #
+    # bright:
+    #   black:   '0x666666'
+    #   red:     '0xff3334'
+    #   green:   '0x9ec400'
+    #   yellow:  '0xe7c547'
+    #   blue:    '0x7aa6da'
+    #   magenta: '0xb77ee0'
+    #   cyan:    '0x54ced6'
+    #   white:   '0xffffff'
+
+  # Visual Bell
+  #
+  # Any time the BEL code is received, Alacritty "rings" the visual bell. Once
+  # rung, the terminal background will be set to white and transition back to the
+  # default background color. You can control the rate of this transition by
+  # setting the `duration` property (represented in milliseconds). You can also
+  # configure the transition function by setting the `animation` property.
+  #
+  # Possible values for `animation`
+  # `Ease`
+  # `EaseOut`
+  # `EaseOutSine`
+  # `EaseOutQuad`
+  # `EaseOutCubic`
+  # `EaseOutQuart`
+  # `EaseOutQuint`
+  # `EaseOutExpo`
+  # `EaseOutCirc`
+  # `Linear`
+  #
+  # To completely disable the visual bell, set its duration to 0.
+  #
+  visual_bell:
+    animation: EaseOutExpo
+    duration: 0
+
+  # Background opacity
+  background_opacity: 1.0
+
+  # Key bindings
+  #
+  # Each binding is defined as an object with some properties. Most of the
+  # properties are optional. All of the alphabetical keys should have a letter for
+  # the `key` value such as `V`. Function keys are probably what you would expect
+  # as well (F1, F2, ..). The number keys above the main keyboard are encoded as
+  # `Key1`, `Key2`, etc. Keys on the number pad are encoded `Number1`, `Number2`,
+  # etc.  These all match the glutin::VirtualKeyCode variants.
+  #
+  # Possible values for `mods`
+  # `Command`, `Super` refer to the super/command/windows key
+  # `Control` for the control key
+  # `Shift` for the Shift key
+  # `Alt` and `Option` refer to alt/option
+  #
+  # mods may be combined with a `|`. For example, requiring control and shift
+  # looks like:
+  #
+  # mods: Control|Shift
+  #
+  # The parser is currently quite sensitive to whitespace and capitalization -
+  # capitalization must match exactly, and piped items must not have whitespace
+  # around them.
+  #
+  # Either an `action`, `chars`, or `command` field must be present.
+  #   `action` must be one of `Paste`, `PasteSelection`, `Copy`, or `Quit`.
+  #   `chars` writes the specified string every time that binding is activated.
+  #     These should generally be escape sequences, but they can be configured to
+  #     send arbitrary strings of bytes.
+  #   `command` must be a map containing a `program` string, and `args` array of
+  #     strings. For example:
+  #     - { ... , command: { program: "alacritty", args: ["-e", "vttest"] } }
+  #
+  # Want to add a binding (e.g. "PageUp") but are unsure what the X sequence
+  # (e.g. "\x1b[5~") is? Open another terminal (like xterm) without tmux,
+  # then run `showkey -a` to get the sequence associated to a key combination.
+  #
+  key_bindings:
+    - { key: V,        mods: Command,       action: Paste                        }
+    - { key: C,        mods: Command,       action: Copy                         }
+    - { key: Q,        mods: Command,       action: Quit                         }
+    - { key: Home,                          chars: "\x1bOH",   mode: AppCursor   }
+    - { key: Home,                          chars: "\x1b[H",   mode: ~AppCursor  }
+    - { key: End,                           chars: "\x1bOF",   mode: AppCursor   }
+    - { key: End,                           chars: "\x1b[F",   mode: ~AppCursor  }
+    - { key: Equals,   mods: Command,       action: IncreaseFontSize             }
+    - { key: Minus,    mods: Command,       action: DecreaseFontSize             }
+    - { key: Minus,    mods: Command|Shift, action: ResetFontSize                }
+    - { key: PageUp,   mods: Shift,         chars: "\x1b[5;2~"                   }
+    - { key: PageUp,   mods: Control,       chars: "\x1b[5;5~"                   }
+    - { key: PageUp,                        chars: "\x1b[5~"                     }
+    - { key: PageDown, mods: Shift,         chars: "\x1b[6;2~"                   }
+    - { key: PageDown, mods: Control,       chars: "\x1b[6;5~"                   }
+    - { key: PageDown,                      chars: "\x1b[6~"                     }
+    - { key: Left,     mods: Shift,         chars: "\x1b[1;2D"                   }
+    - { key: Left,     mods: Control,       chars: "\x1b[1;5D"                   }
+    - { key: Left,     mods: Alt,           chars: "\x1b[1;3D"                   }
+    - { key: Left,                          chars: "\x1b[D",   mode: ~AppCursor  }
+    - { key: Left,                          chars: "\x1bOD",   mode: AppCursor   }
+    - { key: Right,    mods: Shift,         chars: "\x1b[1;2C"                   }
+    - { key: Right,    mods: Control,       chars: "\x1b[1;5C"                   }
+    - { key: Right,    mods: Alt,           chars: "\x1b[1;3C"                   }
+    - { key: Right,                         chars: "\x1b[C",   mode: ~AppCursor  }
+    - { key: Right,                         chars: "\x1bOC",   mode: AppCursor   }
+    - { key: Up,       mods: Shift,         chars: "\x1b[1;2A"                   }
+    - { key: Up,       mods: Control,       chars: "\x1b[1;5A"                   }
+    - { key: Up,       mods: Alt,           chars: "\x1b[1;3A"                   }
+    - { key: Up,                            chars: "\x1b[A",   mode: ~AppCursor  }
+    - { key: Up,                            chars: "\x1bOA",   mode: AppCursor   }
+    - { key: Down,     mods: Shift,         chars: "\x1b[1;2B"                   }
+    - { key: Down,     mods: Control,       chars: "\x1b[1;5B"                   }
+    - { key: Down,     mods: Alt,           chars: "\x1b[1;3B"                   }
+    - { key: Down,                          chars: "\x1b[B",   mode: ~AppCursor  }
+    - { key: Down,                          chars: "\x1bOB",   mode: AppCursor   }
+    - { key: Tab,      mods: Shift,         chars: "\x1b[Z"                      }
+    - { key: F1,                            chars: "\x1bOP"                      }
+    - { key: F2,                            chars: "\x1bOQ"                      }
+    - { key: F3,                            chars: "\x1bOR"                      }
+    - { key: F4,                            chars: "\x1bOS"                      }
+    - { key: F5,                            chars: "\x1b[15~"                    }
+    - { key: F6,                            chars: "\x1b[17~"                    }
+    - { key: F7,                            chars: "\x1b[18~"                    }
+    - { key: F8,                            chars: "\x1b[19~"                    }
+    - { key: F9,                            chars: "\x1b[20~"                    }
+    - { key: F10,                           chars: "\x1b[21~"                    }
+    - { key: F11,                           chars: "\x1b[23~"                    }
+    - { key: F12,                           chars: "\x1b[24~"                    }
+    - { key: Back,                          chars: "\x7f"                        }
+    - { key: Back,     mods: Alt,           chars: "\x1b\x7f"                    }
+    - { key: Insert,                        chars: "\x1b[2~"                     }
+    - { key: Delete,                        chars: "\x1b[3~"                     }
+
+      # Open a new alacritty window
+    - { key: N,        mods: Command,       command: { program: "/usr/bin/open", args: [ "-n", "/Users/trevor/Applications/Alacritty.app" ]} }
+
+      # shortcuts for tmux. the leader key is control-b (0x02)
+    - { key: W,        mods: Command,       chars: "\x02&"                       }  # close tab (kill)
+    - { key: T,        mods: Command,       chars: "\x02c"                       }  # new tab
+    - { key: RBracket, mods: Command|Shift, chars: "\x02n"                       }  # select next tab
+    - { key: LBracket, mods: Command|Shift, chars: "\x02p"                       }  # select previous tab
+    - { key: RBracket, mods: Command,       chars: "\x02o"                       }  # select next pane
+    - { key: LBracket, mods: Command,       chars: "\x02;"                       }  # select last (previously used) pane
+    - { key: F,        mods: Command,       chars: "\x02/"                       }  # search (upwards) (see tmux.conf)
+
+  # Mouse bindings
+  #
+  # Currently doesn't support modifiers. Both the `mouse` and `action` fields must
+  # be specified.
+  #
+  # Values for `mouse`:
+  # - Middle
+  # - Left
+  # - Right
+  # - Numeric identifier such as `5`
+  #
+  # Values for `action`:
+  # - Paste
+  # - PasteSelection
+  # - Copy (TODO)
+  mouse_bindings:
+    - { mouse: Middle, action: PasteSelection }
+
+  mouse:
+    double_click: { threshold: 300 }
+    triple_click: { threshold: 300 }
+
+  selection:
+    semantic_escape_chars: ",│`|:\"' ()[]{}<>"
+
+  hide_cursor_when_typing: true
+
+  # Live config reload (changes require restart)
+  live_config_reload: true
+
+  # Shell
+  #
+  # You can set shell.program to the path of your favorite shell, e.g. /bin/fish.
+  # Entries in shell.args are passed unmodified as arguments to the shell.
+  # shell:
+    # program: /usr/local/homebrew/bin/fish
+    # args:
+      # - --command=tmux
+
+  # vim: nospell
+#+END_SRC
+
+*** Symlinks
+    
+#+BEGIN_SRC sh :tangle config/make_symlinks.sh :noweb yes
+  ln -fs $HOME/dotfiles/config/alacritty.yml $HOME/.config/alacritty/alacritty.yml
+#+END_SRC
+
+* Custom Launchers
+  
+These will add little scripts that mainly launch web pages as aliases.
+
+Originally these were their own executable sh files that got added to ~$PATH~.
+
+Actually looking much better to just add them as aliases to .bashrc
+
+** Inbox
+
+This'll ask firefox to open with a profile I have saved to my system that launches fullscreen with my inbox open.
+
+#+BEGIN_SRC bash :tangle config/.bashrc
+  alias inbox="google-chrome-stable --app=https://inbox.google.com"
+#+END_SRC
+
+** Reddit
+
+#+BEGIN_SRC bash :tangle config/.bashrc
+  alias reddit="google-chrome-stable --app=https://www.reddit.com"
+#+END_SRC
+
+
+** Play Music
+
+#+BEGIN_SRC bash :tangle config/.bashrc
+  alias music="google-chrome-stable --app=https://play.google.com/music/listen#/home"
+#+END_SRC
+
+** Youtube
+
+#+BEGIN_SRC bash :tangle config/.bashrc
+  alias youtube="google-chrome-stable --app=https://youtube.com"
+#+END_SRC
+
+** Hacker News
+
+#+BEGIN_SRC bash :tangle config/.bashrc
+  alias hnews="google-chrome-stable --app=https://news.ycombinator.com/"
+#+END_SRC
