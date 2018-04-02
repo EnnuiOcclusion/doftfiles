@@ -81,6 +81,7 @@ This guy does the actual layout of the windows on the screen.
   import XMonad.Layout.Spacing
   import XMonad.Actions.CycleWS
   import System.IO
+  import Graphics.X11.ExtraTypes.XF86
 
   main = do
       xmproc <- spawnPipe "xmobar"
@@ -109,6 +110,9 @@ This guy does the actual layout of the windows on the screen.
           , ((controlMask, xK_Print), spawn "sleep 0.2; scrot -s")
           , ((0, xK_Print), spawn "scrot")
           , ((mod4Mask, xK_apostrophe), spawn "emacs-anywhere")
+          , ((0, xF86XK_AudioRaiseVolume), spawn "amixer set Master 5%+")
+          , ((0, xF86XK_AudioLowerVolume), spawn "amixer set Master 5%-")
+          , ((0, xF86XK_AudioMute), spawn "amixer set Master toggle")
           -- , ((mod4Mask), xK_o, swapNextScreen)
           -- , ((mod4Mask .|. shiftMask, xK_o), shiftNextScreen)
           ]
@@ -761,14 +765,13 @@ Written in rust. Building this was my first real exposure to the language. The b
 * Custom Launchers
   
 These will add little scripts that mainly launch web pages as aliases.
+Launching Chrom in ~--app~ mode gives you these cool little seamless tiles that play well with the environment.
 
 Originally these were their own executable sh files that got added to ~$PATH~.
 
 Actually looking much better to just add them as aliases to .bashrc
 
 ** Inbox
-
-This'll ask firefox to open with a profile I have saved to my system that launches fullscreen with my inbox open.
 
 #+BEGIN_SRC bash :tangle config/.bashrc
   alias inbox="google-chrome-stable --app=https://inbox.google.com"
@@ -797,4 +800,19 @@ This'll ask firefox to open with a profile I have saved to my system that launch
 
 #+BEGIN_SRC bash :tangle config/.bashrc
   alias hnews="google-chrome-stable --app=https://news.ycombinator.com/"
+#+END_SRC
+
+** Eclectic 24
+   
+This just opens up the raw stream of KCRW's eclectic 24. I'd love to build a little front-end that shows album art and song information.
+This is what radio should be like.
+   
+#+BEGIN_SRC bash :tangle config/.bashrc
+  alias muzak="google-chrome-stable --app=https://kcrw.streamguys1.com/kcrw_192k_mp3_e24"
+#+END_SRC
+
+** Pocket Casts
+
+#+BEGIN_SRC bash :tangle config/.bashrc
+  alias podcast="google-chrome-stable --app=https://playbeta.pocketcasts.com/web/new-releases"
 #+END_SRC
