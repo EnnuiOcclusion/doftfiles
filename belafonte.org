@@ -1,3 +1,14 @@
+* [[https://www.youtube.com/watch?v=d1RnYfFZK2k][Let Me Tell You About My Boat]]
+
+I wanted to try my hand at UI design and make something that I would enjoy using for most of my day to day work.
+
+The basic idea is that if Wes Anderson made a Sci-Fi epic that was /Solaris/ meets /2001: A Space Odyssey/, this is what the computers on board would look like.
+
+Like any self-respecting-FUI all actions can be performed entirely from the [[http://tvtropes.org/pmwiki/pmwiki.php/Main/RapidFireTyping][keyboard]]. Mouse support is available for software that requires it, but the mouse disappears when not in use.
+
+This is ultimately for fun to make something that's looks provacative while still remaining confoundingly practical. Don't take it too seriously and please share any ideas for improvements.
+
+
 * Config
   
 The one config file to rule them all!
@@ -35,14 +46,14 @@ There are about 15 different places that X can look for its configuration on sta
 
   # Set up an icon tray
 
-  trayer --edge top --align right --SetDockType true --SetPartialStrut true --expand true --width 10 --transparent true --tint 0x191970 --height 12 &
+  # trayer --edge top --align right --SetDockType true --SetPartialStrut true --expand true --width 10 --transparent true --tint 0x191970 --height 12 &
 
   # Fire up apps
 
-  xscreensaver -no-splash &
+  # xscreensaver -no-splash &
 
   # Start system tray
-  stalonetray &
+  # stalonetray &
 
   # Start our compositor, which draws shadows & effects
   compton &
@@ -52,6 +63,13 @@ There are about 15 different places that X can look for its configuration on sta
 
   # This guy hides the mouse after 5 seconds of inactivity
   unclutter -grab &
+
+  # This adjusts the color temperature to take out some blue at night
+  redshift &
+
+  # Detect all monitors and set DP-0 as the main
+  xrandr --auto
+  xrandr --output DP-0 --primary
 
   # Start xmonad
   exec xmonad
@@ -78,7 +96,13 @@ This guy does the actual layout of the windows on the screen.
   import XMonad.Hooks.ManageDocks
   import XMonad.Util.Run(spawnPipe)
   import XMonad.Util.EZConfig(additionalKeys)
+  import XMonad.Util.Themes
   import XMonad.Layout.Spacing
+  import XMonad.Layout.SimpleDecoration
+  import XMonad.Layout.DwmStyle
+  import XMonad.Layout.Tabbed
+  import XMonad.Layout.TabBarDecoration
+  import XMonad.Layout.IndependentScreens
   import XMonad.Actions.CycleWS
   import System.IO
   import Graphics.X11.ExtraTypes.XF86
@@ -87,36 +111,49 @@ This guy does the actual layout of the windows on the screen.
       xmproc <- spawnPipe "xmobar"
 
       xmonad $ defaultConfig
-          { -- startupHook = do
+          {
+            -- startupHook = do
               -- rects <- xdisplays
               -- xmproc <- spwanPipe "xmobar"
           manageHook = manageDocks <+> manageHook defaultConfig
-          , layoutHook = avoidStruts  $  smartSpacingWithEdge 20 $ layoutHook defaultConfig
-          , logHook = dynamicLogWithPP xmobarPP
+          , layoutHook = avoidStruts  $ smartSpacingWithEdge 20 $ layoutHook defaultConfig
+          , logHook = dynamicLogWithPP $ xmobarPP
             { ppOutput = hPutStrLn xmproc
              , ppTitle = xmobarColor "#657b83" "" . shorten 100
              , ppCurrent = xmobarColor "#c0c0c0" "" . wrap "" ""
              , ppSep     = xmobarColor "#c0c0c0" "" " | "
              , ppUrgent  = xmobarColor "#ff69b4" ""
              , ppLayout = const "" -- to disable the layout info on xmobar
-             }
+            }
           , modMask = mod4Mask     -- Rebind Mod to the Windows key
           , terminal = "alacritty" -- Get that speedy goodness
           , borderWidth = 3
-          , focusedBorderColor = "#586e75"
+          , focusedBorderColor = "#b58900"
           , normalBorderColor = "#002b36"
           } `additionalKeys`
           [ ((mod4Mask .|. shiftMask, xK_z), spawn "xscreensaver-command -lock; xset dpms force off")
           , ((controlMask, xK_Print), spawn "sleep 0.2; scrot -s")
           , ((0, xK_Print), spawn "scrot")
           , ((mod4Mask, xK_apostrophe), spawn "emacs-anywhere")
-          , ((0, xF86XK_AudioRaiseVolume), spawn "amixer set Master 5%+")
-          , ((0, xF86XK_AudioLowerVolume), spawn "amixer set Master 5%-")
+
+          -- Sound Toggling
+          , ((0, xF86XK_AudioRaiseVolume), spawn "amixer set Master 2%+")
+          , ((shiftMask, xF86XK_AudioRaiseVolume), spawn "amixer set Master 10%+")
+          , ((0, xF86XK_AudioLowerVolume), spawn "amixer set Master 2%-")
+          , ((shiftMask, xF86XK_AudioLowerVolume), spawn "amixer set Master 10%-")
           , ((0, xF86XK_AudioMute), spawn "amixer set Master toggle")
+
+          -- These guys toggle outputting to both speakers and headphones, you are ejecting the sound!
+          , ((0, xF86XK_Eject), spawn "amixer sset 'Auto-Mute Mode' Disabled")
+          , ((shiftMask, xF86XK_Eject), spawn "amixer sset 'Auto-Mute Mode' Enabled")
+
+          -- Quick launch with some of the extra keys
+          , ((mod4Mask, xK_bracketright), spawn "google-chrome-stable --app")
+          , ((0, xF86XK_Tools), spawn "google-chrome-stable --app=https://inbox.google.com")
+
           -- , ((mod4Mask), xK_o, swapNextScreen)
           -- , ((mod4Mask .|. shiftMask, xK_o), shiftNextScreen)
           ]
-
 #+END_SRC
 
 *** Symlinks
@@ -124,6 +161,123 @@ This guy does the actual layout of the windows on the screen.
 #+BEGIN_SRC sh :tangle config/make_symlinks.sh :noweb yes
   mkdir -p $HOME/.xmonad
   ln -fs $HOME/dotfiles/config/xmonad.hs $HOME/.xmonad/xmonad.hs
+#+END_SRC
+
+** Xmobar
+
+#+BEGIN_SRC haskell :tangle config/.xmobarrc
+  Config { 
+
+     -- appearance
+       font =         "xft:Fira Code Retina:size=8:bold:antialias=true"
+     , bgColor =      "#073642"
+     , fgColor =      "#646464"
+     , position =     Top
+     , border =       BottomB
+     , borderColor =  "#646464"
+
+     -- layout
+     , sepChar =  "%"   -- delineator between plugin names and straight text
+     , alignSep = "}{"  -- separator between left-right alignment
+     , template = "%battery% | %multicpu% | %coretemp% | %memory% | %dynnetwork% }{ %RJTT% | %date% || %kbd% "
+
+     -- general behavior
+     , lowerOnStart =     True    -- send to bottom of window stack on start
+     , hideOnStart =      False   -- start with window unmapped (hidden)
+     , allDesktops =      True    -- show on all desktops
+     , overrideRedirect = True    -- set the Override Redirect flag (Xlib)
+     , pickBroadest =     False   -- choose widest display (multi-monitor)
+     , persistent =       True    -- enable/disable hiding (True = disabled)
+
+     -- plugins
+     --   Numbers can be automatically colored according to their value. xmobar
+     --   decides color based on a three-tier/two-cutoff system, controlled by
+     --   command options:
+     --     --Low sets the low cutoff
+     --     --High sets the high cutoff
+     --
+     --     --low sets the color below --Low cutoff
+     --     --normal sets the color between --Low and --High cutoffs
+     --     --High sets the color above --High cutoff
+     --
+     --   The --template option controls how the plugin is displayed. Text
+     --   color can be set by enclosing in <fc></fc> tags. For more details
+     --   see http://projects.haskell.org/xmobar/#system-monitor-plugins.
+     , commands = 
+
+          -- weather monitor
+          [ Run Weather "LAX" [ "--template", "<skyCondition> | <fc=#4682B4><tempC></fc>°C | <fc=#4682B4><rh></fc>% | <fc=#4682B4><pressure></fc>hPa"
+                               ] 36000
+
+          -- network activity monitor (dynamic interface resolution)
+          , Run DynNetwork     [ "--template" , "<dev>: <tx>kB/s|<rx>kB/s"
+                               , "--Low"      , "1000"       -- units: B/s
+                               , "--High"     , "5000"       -- units: B/s
+                               , "--low"      , "darkgreen"
+                               , "--normal"   , "darkorange"
+                               , "--high"     , "darkred"
+                               ] 10
+
+          -- cpu activity monitor
+          , Run MultiCpu       [ "--template" , "Cpu: <total0>%|<total1>%"
+                               , "--Low"      , "50"         -- units: %
+                               , "--High"     , "85"         -- units: %
+                               , "--low"      , "darkgreen"
+                               , "--normal"   , "darkorange"
+                               , "--high"     , "darkred"
+                               ] 10
+
+          -- cpu core temperature monitor
+          , Run CoreTemp       [ "--template" , "Temp: <core0>°C|<core1>°C"
+                               , "--Low"      , "70"        -- units: °C
+                               , "--High"     , "80"        -- units: °C
+                               , "--low"      , "darkgreen"
+                               , "--normal"   , "darkorange"
+                               , "--high"     , "darkred"
+                               ] 50
+
+          -- memory usage monitor
+          , Run Memory         [ "--template" ,"Mem: <usedratio>%"
+                               , "--Low"      , "20"        -- units: %
+                               , "--High"     , "90"        -- units: %
+                               , "--low"      , "darkgreen"
+                               , "--normal"   , "darkorange"
+                               , "--high"     , "darkred"
+                               ] 10
+
+          -- battery monitor
+          -- , Run Battery        [ "--template" , "Batt: <acstatus>"
+          --                      , "--Low"      , "10"        -- units: %
+          --                      , "--High"     , "80"        -- units: %
+          --                      , "--low"      , "darkred"
+          --                      , "--normal"   , "darkorange"
+          --                      , "--high"     , "darkgreen"
+
+          --                      , "--" -- battery specific options
+          --                                -- discharging status
+          --                                , "-o"	, "<left>% (<timeleft>)"
+          --                                -- AC "on" status
+          --                                , "-O"	, "<fc=#dAA520>Charging</fc>"
+          --                                -- charged status
+          --                                , "-i"	, "<fc=#006000>Charged</fc>"
+          --                      ] 50
+
+          -- time and date indicator
+          --   (%F = y-m-d date, %a = day of week, %T = h:m:s time)
+          , Run Date           "<fc=#ABABAB>%F (%a) %T</fc>" "date" 10
+
+          -- keyboard layout indicator
+          , Run Kbd            [ ("us(dvorak)" , "<fc=#00008B>DV</fc>")
+                               , ("us"         , "<fc=#8B0000>US</fc>")
+                               ]
+          ]
+     }
+#+END_SRC
+
+*** Symlinks
+    
+#+BEGIN_SRC sh :tangle config/make_symlinks.sh :noweb yes
+  ln -fs $HOME/dotfiles/config/.xmobarrc $HOME/.xmobarrc
 #+END_SRC
 
 ** Compton
@@ -195,11 +349,11 @@ This is our window compositor. It makes things look nice by adding shadows and f
   # Zero the part of the shadow's mask behind the window. Fix some weirdness with ARGB windows.
   clear-shadow = true;
   # The blur radius for shadows. (default 12)
-  shadow-radius = 20;
+  shadow-radius = 18;
   # The left offset for shadows. (default -15)
-  shadow-offset-x = -18;
+  shadow-offset-x = -27;
   # The top offset for shadows. (default -15)
-  shadow-offset-y = -18;
+  shadow-offset-y = -27;
   # The translucency for shadows. (default .75)
   shadow-opacity = .75;
 
@@ -209,9 +363,19 @@ This is our window compositor. It makes things look nice by adding shadows and f
   shadow-blue =     0;
 
   # Set a different colored shadow for the selected window.
-  shadow-focused-red = 0.32421875;
-  shadow-focused-green = 0.70703125;
-  shadow-focused-blue = 0.8046875;
+  # shadow-red = 0.32421875;
+  # shadow-green = 0.70703125;
+  # shadow-blue = 0.8046875;
+
+  # Base 3
+  # shadow-red = 0.98828125;
+  # shadow-green = 0.9609375;
+  # shadow-blue = 0.88671875;
+
+  # Base 3
+  # shadow-red = 0;
+  # shadow-green = 0.16796875;
+  # shadow-blue = 0.2109375;
 
   # The shadow exclude options are helpful if you have shadows enabled. Due to the way compton draws its shadows, certain applications will have visual glitches
   # (most applications are fine, only apps that do weird things with xshapes or argb are affected).
@@ -246,16 +410,16 @@ This is our window compositor. It makes things look nice by adding shadows and f
   #################################
 
   menu-opacity = 0.8;
-  inactive-opacity = 0.25;
+  inactive-opacity = 1;
   active-opacity = 1;
   frame-opacity = 1;
-  inactive-opacity-override = true;
+  inactive-opacity-override = false;
   alpha-step = 0.06;
 
   # Dim inactive windows. (0.0 - 1.0)
-  inactive-dim = 0.1;
+  inactive-dim = 0.0;
   # Do not let dimness adjust based on window opacity.
-  # inactive-dim-fixed = true;
+  inactive-dim-fixed = true;
   # Blur background of transparent windows. Bad performance with X Render backend. GLX backend is preferred.
   blur-background = true;
   # Blur background of opaque windows with transparent frames as well.
@@ -295,12 +459,12 @@ This is our window compositor. It makes things look nice by adding shadows and f
   #################################
 
   # Try to detect WM windows and mark them as active.
-  mark-wmwin-focused = true;
+  # mark-wmwin-focused = true;
   # Mark all non-WM but override-redirect windows active (e.g. menus).
-  mark-ovredir-focused = true;
+  # mark-ovredir-focused = false;
   # Use EWMH _NET_WM_ACTIVE_WINDOW to determine which window is focused instead of using FocusIn/Out events.
   # Usually more reliable but depends on a EWMH-compliant WM.
-  use-ewmh-active-win = true;
+  # use-ewmh-active-win = true;
   # Detect rounded corners and treat them as rectangular when --shadow-ignore-shaped is on.
   detect-rounded-corners = true;
 
@@ -762,6 +926,7 @@ Written in rust. Building this was my first real exposure to the language. The b
   ln -fs $HOME/dotfiles/config/alacritty.yml $HOME/.config/alacritty/alacritty.yml
 #+END_SRC
 
+
 * Custom Launchers
   
 These will add little scripts that mainly launch web pages as aliases.
@@ -782,7 +947,6 @@ Actually looking much better to just add them as aliases to .bashrc
 #+BEGIN_SRC bash :tangle config/.bashrc
   alias reddit="google-chrome-stable --app=https://www.reddit.com"
 #+END_SRC
-
 
 ** Play Music
 
