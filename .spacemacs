@@ -30,7 +30,8 @@ values."
    dotspacemacs-configuration-layer-path '()
    ;; List of configuration layers to load.
    dotspacemacs-configuration-layers
-   '(
+   '(yaml
+     rust
      haskell
      python
      javascript
@@ -120,6 +121,8 @@ values."
    ;; section of the documentation for details on available variables.
    ;; (default 'vim)
    dotspacemacs-editing-style 'vim
+   ;; Needed to add this to pass test.
+   dotspacemacs-mode-line-theme 'spacemacs
    ;; If non nil output loading progress in `*Messages*' buffer. (default nil)
    dotspacemacs-verbose-loading nil
    ;; Specify the startup banner. Default value is `official', it displays
@@ -144,15 +147,19 @@ values."
    ;; List of themes, the first of the list is loaded when spacemacs starts.
    ;; Press <SPC> T n to cycle to the next theme in the list (works great
    ;; with 2 themes variants, one dark and one light)
-   dotspacemacs-themes '(spacemacs-dark
-                         spacemacs-light)
-   dotspacemacs-mode-line-theme 'spacemacs
+   dotspacemacs-themes '(solarized-dark
+                         solarized-light
+                         espresso
+                         flatui
+                         sanityinc-solarized-light
+                         spacemacs-light
+                         spacemacs-dark)
    ;; If non nil the cursor color matches the state color in GUI Emacs.
    dotspacemacs-colorize-cursor-according-to-state t
    ;; Default font, or prioritized list of fonts. `powerline-scale' allows to
    ;; quickly tweak the mode-line size to make separators look not too crappy.
    dotspacemacs-default-font '("Fira Code Retina"
-                               :size 14
+                               :size 16
                                :weight normal
                                :width normal
                                :powerline-scale 1.1)
@@ -186,7 +193,7 @@ values."
    dotspacemacs-retain-visual-state-on-shift t
    ;; If non-nil, J and K move lines up and down when in visual mode.
    ;; (default nil)
-   dotspacemacs-visual-line-move-text nil
+   dotspacemacs-visual-line-move-text true
    ;; If non nil, inverse the meaning of `g' in `:substitute' Evil ex-command.
    ;; (default nil)
    dotspacemacs-ex-substitute-global nil
@@ -319,7 +326,8 @@ executes.
  This function is mostly useful for variables that need to be set
 before packages are loaded. If you are unsure, you should try in setting them in
 `dotspacemacs/user-config' first."
-  (setq evil-want-abbrev-expand-on-insert-exit nil))
+  (setq-default evil-want-abbrev-expand-on-insert-exit nil)
+  )
 
 (defun dotspacemacs/user-config ()
   "Configuration function for user code.
@@ -474,7 +482,10 @@ This function is called at the very end of Spacemacs initialization."
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(cider-default-repl-command "clj")
+ '(ansi-color-faces-vector
+   [default bold shadow italic underline bold bold-italic bold])
+ '(evil-want-Y-yank-to-eol nil)
+ '(hl-paren-background-colors (quote ("#2492db" "#95a5a6" nil)))
  '(package-selected-packages
    (quote
     (yasnippet-snippets symon string-inflection sayid ruby-refactor ruby-hash-syntax rjsx-mode proof-general pippel pipenv password-generator parinfer overseer org-brain nameless magit-svn json-navigator hierarchy importmagic epc ctable concurrent deferred impatient-mode helm-xref helm-purpose window-purpose imenu-list helm-mu evil-org evil-lion evil-goggles evil-cleverparens editorconfig dante lcr counsel-projectile counsel swiper ivy company-coq company-math math-symbol-lists clojure-cheatsheet centered-cursor-mode browse-at-remote font-lock+ dotenv-mode powerline parent-mode projectile flx smartparens iedit anzu evil goto-chg undo-tree hydra spinner pkg-info epl bind-map bind-key packed f dash s helm avy helm-core async popup spaceline-all-the-icons all-the-icons memoize shader-mode pdf-tools tablist omnisharp shut-up mu4e-maildirs-extension mu4e-alert ht intero inf-clojure hlint-refactor hindent helm-hoogle haskell-snippets flycheck-haskell csharp-mode company-ghci company-ghc ghc haskell-mode company-cabal cmm-mode yapfify xterm-color web-mode web-beautify unfill tagedit smeargle slim-mode shell-pop scss-mode sass-mode rvm ruby-tools ruby-test-mode rubocop rspec-mode robe rcirc-notify rcirc-color rbenv rake pyvenv pytest pyenv-mode py-isort pug-mode pip-requirements orgit org-projectile org-category-capture org-present org-pomodoro alert log4e gntp org-mime org-download olivetti mwim multi-term mmm-mode minitest markdown-toc markdown-mode magit-gitflow livid-mode skewer-mode simple-httpd live-py-mode less-css-mode json-mode json-snatcher json-reformat js2-refactor js2-mode js-doc hy-mode htmlize helm-pydoc helm-gitignore helm-css-scss helm-company helm-c-yasnippet haml-mode gnuplot gitignore-mode gitconfig-mode gitattributes-mode git-timemachine git-messenger git-link git-gutter-fringe+ git-gutter-fringe fringe-helper git-gutter+ git-gutter gh-md fuzzy flyspell-correct-helm flyspell-correct flycheck-pos-tip pos-tip flycheck evil-magit magit magit-popup git-commit ghub let-alist with-editor eshell-z eshell-prompt-extras esh-help emmet-mode diff-hl cython-mode csv-mode company-web web-completion-data company-tern dash-functional tern company-statistics company-anaconda company coffee-mode clojure-snippets clj-refactor inflections edn multiple-cursors paredit peg cider-eval-sexp-fu highlight cider seq queue clojure-mode chruby bundler inf-ruby auto-yasnippet yasnippet auto-dictionary anaconda-mode pythonic ac-ispell auto-complete evil-search-highlight-persist eval-sexp-fu ws-butler winum which-key volatile-highlights vi-tilde-fringe uuidgen use-package toc-org spaceline restart-emacs request rainbow-delimiters popwin persp-mode pcre2el paradox org-plus-contrib org-bullets open-junk-file neotree move-text macrostep lorem-ipsum linum-relative link-hint indent-guide hungry-delete hl-todo highlight-parentheses highlight-numbers highlight-indentation helm-themes helm-swoop helm-projectile helm-mode-manager helm-make helm-flx helm-descbinds helm-ag google-translate golden-ratio flx-ido fill-column-indicator fancy-battery eyebrowse expand-region exec-path-from-shell evil-visualstar evil-visual-mark-mode evil-unimpaired evil-tutor evil-surround evil-numbers evil-nerd-commenter evil-mc evil-matchit evil-lisp-state evil-indent-plus evil-iedit-state evil-exchange evil-escape evil-ediff evil-args evil-anzu elisp-slime-nav dumb-jump diminish define-word column-enforce-mode clean-aindent-mode auto-highlight-symbol auto-compile aggressive-indent adaptive-wrap ace-window ace-link ace-jump-helm-line)))
